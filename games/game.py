@@ -1,5 +1,7 @@
 import pygame
-
+from ultilities.zombies_class import Zombie, ZOMBIE_WIDTH, ZOMBIE_HEIGHT
+from ultilities.bullet_class import Bullet
+from random import randint
 
 class Game:
     def __init__(self):
@@ -9,6 +11,8 @@ class Game:
         self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
         self.clock = pygame.time.Clock()
         self.vel = 5
+        self.zombies_defeated = 0
+        pygame.display.set_caption('Zombies Shooting')
 
         # Colors
         self.RED = (255, 0, 0)
@@ -23,10 +27,7 @@ class Game:
         # Font
         self.font = pygame.font.Font('fonts/Daydream.ttf', 24)
 
-        # Rectangles
-        self.obstacle = pygame.Rect(300, 100, 50, 50)
-
-        # Images
+        # Images / Rectangles
         self.player_rect = pygame.Rect(155, 260, 50, 50)
         self.soldier = pygame.image.load('images/soldier.png').convert_alpha()
         self.soldier = pygame.transform.scale(self.soldier, (50, 50))
@@ -39,6 +40,18 @@ class Game:
         self.r_rect.center = self.refresh_rect.center
         self.r_key = pygame.image.load('images/keys/r_black.png').convert_alpha()
         self.r_key = pygame.transform.scale(self.r_key, (30, 30))
+
+        # Zombie settings
+        self.zombie_frames = []
+        for i in range(1, 17):
+            frame = pygame.image.load(f'images/zombie1_gif/zombie1_{i}.png').convert_alpha()
+            frame = pygame.transform.scale(frame, (ZOMBIE_WIDTH, ZOMBIE_HEIGHT))
+            self.zombie_frames.append(frame)
+
+        self.zombie_vel = 0.6
+        self.zombies = []
+        for _ in range(randint(3, 6)):
+            self.add_zombie()   
 
         # Bullet settings
         self.bullet_height = 25
@@ -62,43 +75,27 @@ class Game:
         self.bullets = []
         self.ready_reload = False
 
-    class Bullet:
-        def __init__(self, x, y, width, height, frames, screen):
-            self.rect = pygame.Rect(x, y, width, height)
-            self.speed = 7
-            self.current_frame = 0
-            self.last_update = pygame.time.get_ticks()
-            self.frame_delay = 60  # milliseconds
-            self.frames = frames
-            self.screen = screen
+    def add_zombie(self):
+            """Add a new zombie at a random position on the right side."""
+            x = randint(450, 550)
+            y = randint(230, self.SCREEN_HEIGHT - ZOMBIE_HEIGHT)
+            new_zombie = Zombie(x, y, ZOMBIE_WIDTH, ZOMBIE_HEIGHT, self.zombie_frames, self.zombie_vel, self.screen)
+            self.zombies.append(new_zombie)
 
-        def move(self):
-            self.rect.x += self.speed
-
-        def update_animation(self):
-            now = pygame.time.get_ticks()
-            if now - self.last_update > self.frame_delay:
-                self.last_update = now
-                self.current_frame = (self.current_frame + 1) % len(self.frames)
-
-        def draw(self):
-            self.screen.blit(self.frames[self.current_frame], self.rect.topleft)
-            self.update_animation()
+    def remove_collided_zombie(self, rect):
+        """Remove a zombie that collides with the given rectangle."""
+        for zombie in self.zombies:
+            if zombie.rect.colliderect(rect):
+                self.zombies.remove(zombie)
+                return True
+        return False     
 
     def moving_keys(self, key):
-        # if key[pygame.K_d] and self.player_rect.right < self.SCREEN_WIDTH:
-        #     self.player_rect.move_ip(self.vel, 0)
-        # if key[pygame.K_a] and self.player_rect.left > 0:
-        #     self.player_rect.move_ip(-self.vel, 0)
-        # if key[pygame.K_w] and self.player_rect.bottom > 310:
-        #     self.player_rect.move_ip(0, -self.vel)
-        # if key[pygame.K_s] and self.player_rect.bottom < self.SCREEN_HEIGHT:
-        #     self.player_rect.move_ip(0, self.vel)
-
         if key[pygame.K_w] and self.player_rect.bottom > 310:
             self.player_rect.move_ip(self.vel, -self.vel)
         if key[pygame.K_s] and self.player_rect.bottom < self.SCREEN_HEIGHT:
             self.player_rect.move_ip(-self.vel, self.vel)
+
     def shooting(self):
         current_time = pygame.time.get_ticks()
         if (
@@ -109,7 +106,7 @@ class Game:
             bullet_y = self.player_rect.y + self.player_rect.height / 2 - 11.5
 
             if len(self.bullets) < self.max_bullets:
-                bullet = self.Bullet(
+                bullet = Bullet(
                     bullet_x,
                     bullet_y,
                     self.bullet_width,
@@ -128,6 +125,7 @@ class Game:
             self.current_bullets = self.max_bullets
             self.last_reload_time = current_time
             self.ready_reload = False
+
 
     def run_game(self):
         run = True
@@ -155,25 +153,42 @@ class Game:
             if key[pygame.K_r]:
                 self.reloading()
 
+            bullet_to_remove = []
+            zombie_to_remove = []
+
+            for bullet in self.bullets:
+                # Check if bullet collides with any zombie
+                for zombie in self.zombies:
+                    if bullet.rect.colliderect(zombie.rect):
+                        zombie_to_remove.append(zombie)
+                        bullet_to_remove.append(bullet)
+                        break
+
+            # Remove collided zombies and bullets
+            for zombie in self.zombies:
+                if zombie in zombie_to_remove:
+                    self.zombies.remove(zombie)
+                    self.add_zombie()
+
+            for bullet in self.bullets:
+                if bullet in bullet_to_remove:
+                    self.bullets.remove(bullet)     
+
             # Drawing bullets
             for bullet in self.bullets:
                 bullet.move()
                 bullet.draw()
 
-            # Draw obstacle
-            obstacle_color = (
-                self.GREEN
-                if any(b.rect.colliderect(self.obstacle) for b in self.bullets)
-                else self.RED
-            )
-            pygame.draw.rect(self.screen, obstacle_color, self.obstacle)
+            # Draw zombies
+            for zombie in self.zombies:
+                zombie.move()
+                zombie.draw()
 
             # Remove collided bullets and those off screen
             self.bullets[:] = [
                 b
                 for b in self.bullets
-                if not b.rect.colliderect(self.obstacle)
-                and b.rect.x < self.SCREEN_WIDTH
+                if b.rect.x < self.SCREEN_WIDTH
             ]
 
             # Draw player rect
