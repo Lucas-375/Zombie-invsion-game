@@ -1,8 +1,8 @@
 import pygame
 from random import randint
 
-ZOMBIE_WIDTH = 75
-ZOMBIE_HEIGHT = 80
+ZOMBIE_WIDTH = 60
+ZOMBIE_HEIGHT = 75
 
 class Zombie:
     """A class representing a single zombie."""
@@ -18,7 +18,7 @@ class Zombie:
 
     def move(self):
         if self.rect.x > 0:
-            self.rect.x -= self.vel
+            self.rect.x -= self.vel 
         else:
             self.rect.x = randint(500, 550)
             self.rect.y = randint(230, self.screen.get_height() - ZOMBIE_HEIGHT)

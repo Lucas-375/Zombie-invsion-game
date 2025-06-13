@@ -3,10 +3,10 @@ import pygame
 class Bullet:
         def __init__(self, x, y, width, height, frames, screen):
             self.rect = pygame.Rect(x, y, width, height)
-            self.speed = 7
+            self.speed = 6
             self.current_frame = 0
             self.last_update = pygame.time.get_ticks()
-            self.frame_delay = 60  # milliseconds
+            self.frame_delay = 40  # milliseconds
             self.frames = frames
             self.screen = screen
 
