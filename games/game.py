@@ -1,16 +1,19 @@
 import pygame
-from ultilities.zombies_class import Zombie, ZOMBIE_WIDTH, ZOMBIE_HEIGHT
+from ultilities.zombies_class import Zombie
 from ultilities.bullet_class import Bullet
 from random import randint
 
 class Game:
+    """Main game class for Zombies Shooting."""
+
     def __init__(self):
+        """Initialize the game, screen, assets, and variables."""
         pygame.init()
         self.SCREEN_WIDTH = 600
         self.SCREEN_HEIGHT = 400
         self.screen = pygame.display.set_mode((self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
         self.clock = pygame.time.Clock()
-        self.vel = 5 
+        self.vel = 5
         pygame.display.set_caption('Zombies Shooting')
 
         # Colors
@@ -24,9 +27,9 @@ class Game:
         self.BG = pygame.transform.scale(self.BG, (self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
        
         # Font
-        self.fonts = {
-        'daydream': pygame.font.Font('fonts/Daydream.ttf', 20),
-        'pixelcraft': pygame.font.Font('fonts/Pixelcraft.ttf', 30),
+        self.FONT = {
+            'daydream': pygame.font.Font('fonts/Daydream.ttf', 20),
+            'pixelcraft': pygame.font.Font('fonts/Pixelcraft.ttf', 30),
         }
 
         # Images / Rectangles
@@ -44,6 +47,9 @@ class Game:
         self.r_key = pygame.transform.scale(self.r_key, (30, 30))
 
         # Zombie settings
+        self.ZOMBIE_WIDTH = 60
+        self.ZOMBIE_HEIGHT = 75
+
         self.zombie_score = 0
         self.last_zombie_added_time = 0  
         self.zombie_spawn_delay = 1500
@@ -52,7 +58,7 @@ class Game:
         self.zombie_frames = []
         for i in range(1, 17):
             frame = pygame.image.load(f'images/zombie1_gif/zombie1_{i}.png').convert_alpha()
-            frame = pygame.transform.scale(frame, (ZOMBIE_WIDTH, ZOMBIE_HEIGHT))
+            frame = pygame.transform.scale(frame, (self.ZOMBIE_WIDTH, self.ZOMBIE_HEIGHT))
             self.zombie_frames.append(frame)
 
         self.zombie_vel = 0.7
@@ -61,37 +67,35 @@ class Game:
             self.add_zombie()
 
         # Bullet settings
-        self.bullet_height = 20
-        self.bullet_width = 20
+        self.BULLET_HEIGHT = 20
+        self.BULLET_WIDTH = 20
 
         self.last_shot_time = 0
         self.last_reload_time = 0
         self.reload_time = 3500
-                
         self.hit_duration = 1000
-        
         self.max_bullets = 3
         self.current_bullets = self.max_bullets
 
         self.frames = []
         for i in range(1, 7):
             frame = pygame.image.load(f'images/bullet_gif/bullet_{i}.png').convert_alpha()
-            frame = pygame.transform.scale(frame, (self.bullet_width, self.bullet_height))
+            frame = pygame.transform.scale(frame, (self.BULLET_WIDTH, self.BULLET_HEIGHT))
             self.frames.append(frame)
 
         self.bullets = []
         self.ready_reload = False
 
-
     # Zombie functions
     def add_zombie(self):
         """Add a new zombie at a random position on the right side."""
         x = randint(450, 550)
-        y = randint(230, self.SCREEN_HEIGHT - ZOMBIE_HEIGHT)
-        new_zombie = Zombie(x, y, ZOMBIE_WIDTH, ZOMBIE_HEIGHT, self.zombie_frames, self.zombie_vel, self.screen)
+        y = randint(230, self.SCREEN_HEIGHT - self.ZOMBIE_HEIGHT)
+        new_zombie = Zombie(x, y, self.ZOMBIE_WIDTH, self.ZOMBIE_HEIGHT, self.zombie_frames, self.zombie_vel, self.screen)
         self.zombies.append(new_zombie)
 
     def add_zombie_with_delay(self):
+        """Add zombies with a delay after one is killed."""
         current_time = pygame.time.get_ticks()
         if (
             current_time - self.last_zombie_added_time > self.zombie_spawn_delay 
@@ -100,10 +104,10 @@ class Game:
             self.last_zombie_added_time = current_time
             self.zombies_to_add -= 1
             self.add_zombie()
-                    
 
     # Shooting functions
     def shooting(self):
+        """Handle shooting bullets if allowed."""
         current_time = pygame.time.get_ticks()
         if (
             self.current_bullets > 0
@@ -116,8 +120,8 @@ class Game:
                 bullet = Bullet(
                     bullet_x,
                     bullet_y,
-                    self.bullet_width,
-                    self.bullet_height,
+                    self.BULLET_WIDTH,
+                    self.BULLET_HEIGHT,
                     self.frames,
                     self.screen,
                 )
@@ -127,15 +131,16 @@ class Game:
             self.last_shot_time = current_time
 
     def reloading(self):
+        """Reload bullets if allowed."""
         current_time = pygame.time.get_ticks()
         if self.ready_reload or self.last_reload_time == 0:
             self.current_bullets = self.max_bullets
             self.last_reload_time = current_time
             self.ready_reload = False 
-    
+
     def change_max_bullets(self):
+        """Change the max bullets based on zombie score."""
         increasing_max_bullet_settings = {
-            # zombie_score: new max_bullet
             0: self.max_bullets,
             5: 4, 
             10: 5,
@@ -146,38 +151,42 @@ class Game:
             self.zombie_score 
             if self.zombie_score in increasing_max_bullet_settings 
             else 0]
-    
-    # Zombies and bullet collisions
+
     def remove_collided_zombies_bullets(self):
+        """Remove zombies and bullets that have collided."""
         bullet_to_remove = []
         zombie_to_remove = []
 
         for bullet in self.bullets:
             for zombie in self.zombies:
                 if bullet.rect.colliderect(zombie.rect):
-                    zombie_to_remove.append(zombie)
                     bullet_to_remove.append(bullet)
-                    self.zombie_score += 1
-                    self.zombies_to_add += 1
+                    zombie.take_damage(50)  
                     break
         
-        # Remove zombies and bullets that collided
         for zombie in self.zombies:
-            if zombie in zombie_to_remove:
-                self.zombies.remove(zombie)
+            if zombie.hp <= 0:
+                zombie_to_remove.append(zombie)
+                self.zombie_score += 1
+                self.zombies_to_add += 1
 
-        for bullet in self.bullets:
-            if bullet in bullet_to_remove:
-                self.bullets.remove(bullet) 
+        self.zombies[:] = [
+            z for z in self.zombies if z not in zombie_to_remove
+        ]
+        self.bullets[:] = [
+            b for b in self.bullets if b not in bullet_to_remove
+        ]       
 
     # Player functions
     def moving_keys(self, key):
+        """Handle player movement keys."""
         if (key[pygame.K_w] or key[pygame.K_UP]) and self.player_rect.bottom > 310:
             self.player_rect.move_ip(self.vel, -self.vel)
         if (key[pygame.K_s] or key[pygame.K_DOWN]) and self.player_rect.bottom < self.SCREEN_HEIGHT:
             self.player_rect.move_ip(-self.vel, self.vel)
 
     def key_inputs(self):
+        """Handle all key inputs."""
         key = pygame.key.get_pressed()
         self.moving_keys(key)
 
@@ -187,23 +196,19 @@ class Game:
         if key[pygame.K_r]:
             self.reloading()
         
-    # Draw text
     def draw_text(self):
+        """Draw bullet count, score, and reload image."""
         current_time = pygame.time.get_ticks()
-
-        # # Draw bullets count
-        bullet_count_render = self.fonts['daydream'].render(
+        bullet_count_render = self.FONT['daydream'].render(
             f"{self.current_bullets} / {self.max_bullets}", True, "black"
         )
         self.screen.blit(bullet_count_render, (470, 360))
 
-        # # Draw zombies score
-        score_render = self.fonts['pixelcraft'].render(
+        score_render = self.FONT['pixelcraft'].render(
             f"Score {self.zombie_score}", True, 'goldenrod'
         )
         self.screen.blit(score_render, (10, 10))
 
-        # Draw reload image
         self.ready_reload = (
             (current_time - self.last_shot_time) > self.reload_time
             and self.current_bullets < self.max_bullets
@@ -212,11 +217,8 @@ class Game:
             self.screen.blit(self.refresh, self.refresh_rect)
             self.screen.blit(self.r_key, self.r_rect)
 
-
-
-
-
     def run_game(self):
+        """Main game loop."""
         run = True
         while run:
             self.clock.tick(60)
@@ -226,44 +228,28 @@ class Game:
                     run = False
 
             self.screen.blit(self.BG, (0, 0))
-
-            # Key inputs
             self.key_inputs()
-
-            # Remove collided zombies and bullets
             self.remove_collided_zombies_bullets()
-
-            # Add zombies with delay
             self.add_zombie_with_delay()
 
-            # Bullets
             for bullet in self.bullets:
                 bullet.move()
                 bullet.draw()
             self.change_max_bullets()
 
-            # Draw zombies
             for zombie in self.zombies:
                 zombie.move()
                 zombie.draw()
 
-            # Remove collided bullets and those off screen
             self.bullets[:] = [
-                b
-                for b in self.bullets
-                if b.rect.x < self.SCREEN_WIDTH
+                b for b in self.bullets if b.rect.x < self.SCREEN_WIDTH
             ]
 
-            # Draw player rect
             self.screen.blit(self.soldier, self.player_rect)
-
-            # Draw text
             self.draw_text()            
-
             pygame.display.flip()
 
         pygame.quit()
-
 
 if __name__ == "__main__":
     game = Game()
