@@ -52,7 +52,7 @@ class Game:
 
         self.zombie_score = 0
         self.last_zombie_added_time = 0  
-        self.zombie_spawn_delay = 1500
+        self.zombie_spawn_delay = 5000
         self.zombies_to_add = 0
 
         self.zombie_frames = []
@@ -62,7 +62,7 @@ class Game:
             self.zombie_frames.append(frame)
 
         self.zombie_vel = 0.7
-        self.zombies = []
+        self.zombies = pygame.sprite.Group()
         for _ in range(3):
             self.add_zombie()
 
@@ -83,7 +83,7 @@ class Game:
             frame = pygame.transform.scale(frame, (self.BULLET_WIDTH, self.BULLET_HEIGHT))
             self.frames.append(frame)
 
-        self.bullets = []
+        self.bullets = pygame.sprite.Group()
         self.ready_reload = False
 
     # Zombie functions
@@ -92,7 +92,7 @@ class Game:
         x = randint(450, 550)
         y = randint(230, self.SCREEN_HEIGHT - self.ZOMBIE_HEIGHT)
         new_zombie = Zombie(x, y, self.ZOMBIE_WIDTH, self.ZOMBIE_HEIGHT, self.zombie_frames, self.zombie_vel, self.screen)
-        self.zombies.append(new_zombie)
+        self.zombies.add(new_zombie)
 
     def add_zombie_with_delay(self):
         """Add zombies with a delay after one is killed."""
@@ -125,7 +125,7 @@ class Game:
                     self.frames,
                     self.screen,
                 )
-                self.bullets.append(bullet)
+                self.bullets.add(bullet)
                 self.current_bullets -= 1
 
             self.last_shot_time = current_time
@@ -154,15 +154,12 @@ class Game:
 
     def remove_collided_zombies_bullets(self):
         """Remove zombies and bullets that have collided."""
-        bullet_to_remove = []
         zombie_to_remove = []
 
-        for bullet in self.bullets:
-            for zombie in self.zombies:
-                if bullet.rect.colliderect(zombie.rect):
-                    bullet_to_remove.append(bullet)
-                    zombie.take_damage(50)  
-                    break
+        hits = pygame.sprite.groupcollide(self.bullets, self.zombies, True, False)
+        for bullet, zombies_hit in hits.items():
+            for zombie in zombies_hit:
+                zombie.take_damage(50)
         
         for zombie in self.zombies:
             if zombie.hp <= 0:
@@ -170,12 +167,11 @@ class Game:
                 self.zombie_score += 1
                 self.zombies_to_add += 1
 
-        self.zombies[:] = [
-            z for z in self.zombies if z not in zombie_to_remove
-        ]
-        self.bullets[:] = [
-            b for b in self.bullets if b not in bullet_to_remove
-        ]       
+        for zombie in zombie_to_remove:
+            self.zombies.remove(zombie)
+        for bullet in self.bullets:
+            if bullet.rect.x > self.SCREEN_WIDTH:
+                self.bullets.remove(bullet)
 
     # Player functions
     def moving_keys(self, key):
@@ -232,18 +228,14 @@ class Game:
             self.remove_collided_zombies_bullets()
             self.add_zombie_with_delay()
 
+            self.bullets.update()
             for bullet in self.bullets:
-                bullet.move()
                 bullet.draw()
             self.change_max_bullets()
 
+            self.zombies.update()
             for zombie in self.zombies:
-                zombie.move()
                 zombie.draw()
-
-            self.bullets[:] = [
-                b for b in self.bullets if b.rect.x < self.SCREEN_WIDTH
-            ]
 
             self.screen.blit(self.soldier, self.player_rect)
             self.draw_text()            
