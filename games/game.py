@@ -30,7 +30,7 @@ class Game:
 
         # Images / Rectangles
         soldier_image  = pygame.image.load('images/soldier.png').convert_alpha()
-        self.soldier = Player(x=155, y=60, width=50, height=50, image=soldier_image, screen=self.screen, )
+        self.soldier = Player(x=95, y=330, width=50, height=50, image=soldier_image, screen=self.screen, )
 
     
         self.refresh_rect = pygame.Rect(400, 345, 50, 50)
