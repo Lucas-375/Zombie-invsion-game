@@ -1,7 +1,8 @@
 import pygame
-from ultilities.zombies_class import Zombie
-from ultilities.bullet_class import Bullet
 from random import randint
+from ultilities.characters import Zombie, Player
+from ultilities.bullet_class import Bullet
+
 
 class Game:
     """Main game class for Zombies Shooting."""
@@ -16,12 +17,6 @@ class Game:
         self.vel = 5
         pygame.display.set_caption('Zombies Shooting')
 
-        # Colors
-        self.RED = (255, 0, 0)
-        self.YELLOW = (255, 255, 0)
-        self.GREEN = (0, 255, 0)
-        self.BLUE = (0, 0, 255)
-
         # Background
         self.BG = pygame.image.load('images/background/combined_background.png').convert()
         self.BG = pygame.transform.scale(self.BG, (self.SCREEN_WIDTH, self.SCREEN_HEIGHT))
@@ -30,13 +25,14 @@ class Game:
         self.FONT = {
             'daydream': pygame.font.Font('fonts/Daydream.ttf', 20),
             'pixelcraft': pygame.font.Font('fonts/Pixelcraft.ttf', 30),
+            'pixelcraft_80': pygame.font.Font('fonts/Pixelcraft.ttf', 80)
         }
 
         # Images / Rectangles
-        self.player_rect = pygame.Rect(155, 260, 50, 50)
-        self.soldier = pygame.image.load('images/soldier.png').convert_alpha()
-        self.soldier = pygame.transform.scale(self.soldier, (50, 50))
+        soldier_image  = pygame.image.load('images/soldier.png').convert_alpha()
+        self.soldier = Player(x=155, y=60, width=50, height=50, image=soldier_image, screen=self.screen, )
 
+    
         self.refresh_rect = pygame.Rect(400, 345, 50, 50)
         self.refresh = pygame.image.load('images/refresh_black.png').convert_alpha()
         self.refresh = pygame.transform.scale(self.refresh, (50, 50))
@@ -69,7 +65,7 @@ class Game:
         # Bullet settings
         self.BULLET_HEIGHT = 20
         self.BULLET_WIDTH = 20
-
+        
         self.last_shot_time = 0
         self.last_reload_time = 0
         self.reload_time = 3500
@@ -105,6 +101,7 @@ class Game:
             self.zombies_to_add -= 1
             self.add_zombie()
 
+    
     # Shooting functions
     def shooting(self):
         """Handle shooting bullets if allowed."""
@@ -113,8 +110,8 @@ class Game:
             self.current_bullets > 0
             and (current_time - self.last_shot_time > 350 or self.last_shot_time == 0)
         ):
-            bullet_x = self.player_rect.x + self.player_rect.width
-            bullet_y = self.player_rect.y + self.player_rect.height / 2 - 11.5
+            bullet_x = self.soldier.rect.x + self.soldier.rect.width
+            bullet_y = self.soldier.rect.y + self.soldier.rect.height / 2 - 11.5
 
             if len(self.bullets) < self.max_bullets:
                 bullet = Bullet(
@@ -173,25 +170,40 @@ class Game:
             if bullet.rect.x > self.SCREEN_WIDTH:
                 self.bullets.remove(bullet)
 
-    # Player functions
-    def moving_keys(self, key):
-        """Handle player movement keys."""
-        if (key[pygame.K_w] or key[pygame.K_UP]) and self.player_rect.bottom > 310:
-            self.player_rect.move_ip(self.vel, -self.vel)
-        if (key[pygame.K_s] or key[pygame.K_DOWN]) and self.player_rect.bottom < self.SCREEN_HEIGHT:
-            self.player_rect.move_ip(-self.vel, self.vel)
+        # Check if the soldier collides with any zombie
+        for zombie in self.zombies:
+            if zombie.collides_with(self.soldier.rect):
+                damage = zombie.hp
+                self.soldier.take_damage(damage)
+                self.zombies.remove(zombie)
+                self.zombies_to_add += 1
 
+    def end_game(self):
+        """End the game if the soldier's HP reaches zero."""
+        skull_image = pygame.image.load('images/skull.png').convert_alpha()
+        skull_image = pygame.transform.scale(skull_image, (550, 350))
+        game_over_text = self.FONT['pixelcraft_80'].render(
+            "Game Over", True, 'crimson'
+        )
+        self.screen.blit(skull_image, (23, 20))
+        self.screen.blit(game_over_text, (40 , self.SCREEN_HEIGHT // 2 - 30))
+
+
+    # Player functions
     def key_inputs(self):
         """Handle all key inputs."""
         key = pygame.key.get_pressed()
-        self.moving_keys(key)
-
+        self.soldier.move(key, self.vel)
+        
         if key[pygame.K_SPACE]:
             self.shooting()
 
         if key[pygame.K_r]:
             self.reloading()
-        
+
+        if key[pygame.K_k]:
+            self.soldier.kill()
+
     def draw_text(self):
         """Draw bullet count, score, and reload image."""
         current_time = pygame.time.get_ticks()
@@ -217,28 +229,33 @@ class Game:
         """Main game loop."""
         run = True
         while run:
-            self.clock.tick(60)
-
             for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    run = False
+                    if event.type == pygame.QUIT:
+                        run = False
 
-            self.screen.blit(self.BG, (0, 0))
-            self.key_inputs()
-            self.remove_collided_zombies_bullets()
-            self.add_zombie_with_delay()
+            if self.soldier.is_alive():
+                self.clock.tick(60)
 
-            self.bullets.update()
-            for bullet in self.bullets:
-                bullet.draw()
-            self.change_max_bullets()
+                self.screen.blit(self.BG, (0, 0))
+                self.key_inputs()
+                self.remove_collided_zombies_bullets()
+                self.add_zombie_with_delay()
 
-            self.zombies.update()
-            for zombie in self.zombies:
-                zombie.draw()
+                self.bullets.update()
+                for bullet in self.bullets:
+                    bullet.draw()
+                self.change_max_bullets()
 
-            self.screen.blit(self.soldier, self.player_rect)
-            self.draw_text()            
+                self.zombies.update()
+                for zombie in self.zombies:
+                    zombie.draw()
+
+                self.soldier.draw()
+                self.draw_text()            
+
+            else:
+                self.end_game()
+
             pygame.display.flip()
 
         pygame.quit()
